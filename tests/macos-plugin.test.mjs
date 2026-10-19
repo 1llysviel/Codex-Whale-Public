@@ -6,11 +6,13 @@ import path from 'node:path';
 import { findCodexCli, registerPlugin, unregisterPlugin, stagePluginTree, cliCandidates, ensureCodexHome } from '../scripts/macos-plugin.mjs';
 import { backupMacInstall } from '../scripts/macos-backup.mjs';
 
+// macOS installer/rollback only; the fixtures assume POSIX paths and modes.
+const macOnly = { skip: process.platform === 'win32' };
 const temp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'whale-mac-plugin-'));
 const write = (file, text) => { fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, text); };
 const manifest = (dir, name = 'api-balance-whale', version = '0.4.1') => write(path.join(dir, '.codex-plugin', 'plugin.json'), JSON.stringify({ name, version }));
 
-test('Codex CLI discovery prefers the first candidate supporting plugin add and rejects an unusable explicit path', () => {
+test('Codex CLI discovery prefers the first candidate supporting plugin add and rejects an unusable explicit path', macOnly, () => {
   const dir = temp(), old = path.join(dir, 'old-codex'), bundled = path.join(dir, 'bundled-codex'), later = path.join(dir, 'later-codex');
   for (const file of [old, bundled, later]) write(file, '');
   const calls = [];
@@ -21,14 +23,14 @@ test('Codex CLI discovery prefers the first candidate supporting plugin add and 
   assert.throws(() => findCodexCli({ candidates: [old], spawn }), /--codex-cli/);
 });
 
-test('desktop-bundled CLI is searched before standalone installs', () => {
+test('desktop-bundled CLI is searched before standalone installs', macOnly, () => {
   const list = cliCandidates({ home: '/fixture-home', env: { PATH: '/opt/homebrew/bin:/usr/bin' } });
   assert.equal(list[0], '/Applications/ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex');
   assert.ok(list.indexOf('/fixture-home/.local/bin/codex') > 0 && list.includes('/usr/bin/codex'));
   assert.equal(new Set(list).size, list.length);
 });
 
-test('registration succeeds only when Codex lists exactly one enabled installation of this version', () => {
+test('registration succeeds only when Codex lists exactly one enabled installation of this version', macOnly, () => {
   const installed = version => ({ installed: [{ pluginId: 'api-balance-whale@personal', version, installed: true, enabled: true }, { pluginId: 'other@personal', version, installed: true, enabled: true }] });
   const fake = list => (file, args) => ({ status: 0, stdout: JSON.stringify(args[1] === 'add' ? { pluginId: args[2] } : list) });
   assert.equal(registerPlugin({ cli: 'codex', marketplaceName: 'personal', version: '0.4.1', spawn: fake(installed('0.4.1')) }).version, '0.4.1');
@@ -41,14 +43,14 @@ test('registration succeeds only when Codex lists exactly one enabled installati
   assert.deepEqual(calls, [['plugin', 'remove', 'api-balance-whale@personal', '--json']]);
 });
 
-test('missing CODEX_HOME is created because the CLI refuses to start without it', () => {
+test('missing CODEX_HOME is created because the CLI refuses to start without it', macOnly, () => {
   const dir = temp(), codexHome = path.join(dir, 'custom-codex');
   assert.equal(ensureCodexHome({ CODEX_HOME: codexHome }, dir), codexHome);
   assert.ok(fs.statSync(codexHome).isDirectory());
   assert.equal(ensureCodexHome({}, dir), path.join(dir, '.codex'));
 });
 
-test('staging moves the replaced plugin aside, never deletes it, and skips development folders', () => {
+test('staging moves the replaced plugin aside, never deletes it, and skips development folders', macOnly, () => {
   const dir = temp(), source = path.join(dir, 'release'), target = path.join(dir, 'plugins', 'api-balance-whale'), retired = path.join(dir, 'backup', 'replaced-plugin');
   manifest(source); write(path.join(source, 'runtime', 'mcp.mjs'), 'new'); write(path.join(source, 'node_modules', 'x.js'), 'dev'); write(path.join(source, '.git', 'HEAD'), 'ref');
   manifest(target, 'api-balance-whale', '0.2.0'); write(path.join(target, 'runtime', 'mcp.mjs'), 'old');
@@ -59,7 +61,7 @@ test('staging moves the replaced plugin aside, never deletes it, and skips devel
   assert.deepEqual(fs.readdirSync(path.dirname(target)), ['api-balance-whale']);
 });
 
-test('staging refuses a target owned by another plugin and leaves it untouched', () => {
+test('staging refuses a target owned by another plugin and leaves it untouched', macOnly, () => {
   const dir = temp(), source = path.join(dir, 'release'), target = path.join(dir, 'plugins', 'api-balance-whale');
   manifest(source); manifest(target, 'someone-else'); write(path.join(target, 'keep.txt'), 'theirs');
   assert.throws(() => stagePluginTree({ source, target, retired: path.join(dir, 'retired') }), /another plugin/);
@@ -68,14 +70,14 @@ test('staging refuses a target owned by another plugin and leaves it untouched',
   assert.deepEqual(fs.readdirSync(path.dirname(target)), ['api-balance-whale']);
 });
 
-test('fresh staging creates the target without a retired copy', () => {
+test('fresh staging creates the target without a retired copy', macOnly, () => {
   const dir = temp(), source = path.join(dir, 'release'), target = path.join(dir, 'plugins', 'api-balance-whale');
   manifest(source);
   assert.equal(stagePluginTree({ source, target, retired: path.join(dir, 'retired') }), null);
   assert.ok(fs.existsSync(path.join(target, '.codex-plugin', 'plugin.json')));
 });
 
-test('version 2 receipt records plugin registration state next to the desktop backup', () => {
+test('version 2 receipt records plugin registration state next to the desktop backup', macOnly, () => {
   const dir = temp(), dataDir = path.join(dir, 'data');
   fs.mkdirSync(dataDir);
   const plugin = { cli: '/codex', marketplaceName: 'personal', previousEntry: null, marketplaceReceipt: null, replacedBackup: null, createdTarget: false };

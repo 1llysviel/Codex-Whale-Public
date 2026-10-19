@@ -7,6 +7,8 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { rollbackMac } from '../scripts/rollback-macos.mjs';
 
+// macOS installer/rollback only; the fixtures assume POSIX paths and modes.
+const macOnly = { skip: process.platform === 'win32' };
 const root = fileURLToPath(new URL('..', import.meta.url));
 const helper = path.join(root, 'scripts', 'marketplace-helper.mjs');
 const write = (file, text) => { fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, text); };
@@ -17,9 +19,9 @@ const tree = (dir, version, marker) => {
   write(path.join(dir, 'marker.txt'), marker);
 };
 
-// A throwaway HOME with data dir, plugin target, personal marketplace, fake launchd and fake Codex CLI.
+// A throwaway HOME (USERPROFILE on Windows) with data dir, plugin target, personal marketplace, fake launchd and fake Codex CLI.
 function fixture({ stage = 'complete', hadInstall = true, registeredBefore = true, replaced = true, version = 2, removeFails = false } = {}) {
-  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'whale-mac-rollback-')), env = { ...process.env, HOME: home, CODEX_HOME: path.join(home, '.codex') };
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'whale-mac-rollback-')), env = { ...process.env, HOME: home, USERPROFILE: home, CODEX_HOME: path.join(home, '.codex') };
   const dataDir = path.join(home, '.codex', 'whale-widget'), target = path.join(home, 'plugins', 'api-balance-whale');
   const backupDir = path.join(dataDir, 'backups', 'macos-test'), cli = path.join(home, 'codex');
   write(cli, '');
@@ -55,7 +57,7 @@ function fixture({ stage = 'complete', hadInstall = true, registeredBefore = tru
   return { home, dataDir, target, backupDir, marketplace, receiptFile, launchd, codex, run };
 }
 
-test('rolling back an upgrade over a registered install restores code, marketplace entry, registration and receipt pointer', async () => {
+test('rolling back an upgrade over a registered install restores code, marketplace entry, registration and receipt pointer', macOnly, async () => {
   const f = fixture();
   const result = await f.run();
   assert.equal(result.reregistered, true);
@@ -72,7 +74,7 @@ test('rolling back an upgrade over a registered install restores code, marketpla
   await assert.rejects(f.run(), /already rolled back/);
 });
 
-test('rolling back a fresh plugin install removes code, registration and marketplace entry and disables following', async () => {
+test('rolling back a fresh plugin install removes code, registration and marketplace entry and disables following', macOnly, async () => {
   const f = fixture({ hadInstall: false, registeredBefore: false, replaced: false });
   fs.rmSync(path.join(f.backupDir, 'previous-rollback-receipt.json'));
   const result = await f.run();
@@ -87,7 +89,7 @@ test('rolling back a fresh plugin install removes code, registration and marketp
   assert.equal(pointer.installId, 'current'); assert.equal(pointer.stage, 'rolled-back');
 });
 
-test('a failure after the marketplace write tolerates a missing registration; earlier failures never call remove', async () => {
+test('a failure after the marketplace write tolerates a missing registration; earlier failures never call remove', macOnly, async () => {
   const late = fixture({ stage: 'marketplace-ready', removeFails: true });
   await late.run();
   assert.equal(late.codex[0], 'plugin remove api-balance-whale@personal');
@@ -99,7 +101,7 @@ test('a failure after the marketplace write tolerates a missing registration; ea
   await assert.rejects(strict.run(), /plugin remove failed: not installed/);
 });
 
-test('check-only validates the receipt and marketplace without touching launchd, Codex or files', async () => {
+test('check-only validates the receipt and marketplace without touching launchd, Codex or files', macOnly, async () => {
   const f = fixture();
   const before = fs.readdirSync(f.backupDir).sort();
   const result = await f.run({ checkOnly: true });
@@ -109,7 +111,7 @@ test('check-only validates the receipt and marketplace without touching launchd,
   assert.equal(fs.readFileSync(path.join(f.target, 'marker.txt'), 'utf8'), 'new');
 });
 
-test('version 1 desktop-only receipts roll back without Codex plugin operations', async () => {
+test('version 1 desktop-only receipts roll back without Codex plugin operations', macOnly, async () => {
   const f = fixture({ version: 1 });
   await f.run();
   assert.deepEqual(f.codex, []);
@@ -117,7 +119,7 @@ test('version 1 desktop-only receipts roll back without Codex plugin operations'
   assert.ok(f.launchd.includes('bootstrap'));
 });
 
-test('a receipt copied away from its backup directory is refused', async () => {
+test('a receipt copied away from its backup directory is refused', macOnly, async () => {
   const f = fixture();
   const stray = path.join(f.home, 'stray-receipt.json');
   fs.copyFileSync(f.receiptFile, stray);
