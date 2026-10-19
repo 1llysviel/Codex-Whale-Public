@@ -1,5 +1,10 @@
 # 变更记录
 
+## 未发布 — macOS 调度中心（Issue #24）
+
+- macOS 挂件窗口在调度中心（Mission Control）和 App Exposé 中隐藏，不再显示为与 Codex 分开的独立窗口；退出调度中心后照常跟随。小鲸鱼与 Codex 是不同进程，调度中心按应用归组，无法合并为同一窗口。仅改 macOS 分支，Windows 不受影响。
+- Apple Silicon 实机目测确认：调度中心不再出现小鲸鱼窗口，退出后恢复显示在 Codex 窗口上。
+
 ## 未发布 — macOS 插件注册（Issue #3）
 
 - `安装插件.command` / `install-macos.mjs` 与 Windows 一致：代码复制到 `~/plugins/api-balance-whale`，旧目录移入私有备份，写入个人市场并 `codex plugin add`，以 `plugin list --json` 确认；支持 `--check-only`、`--codex-cli`，`--desktop-only` 保留原有仅桌面方式。

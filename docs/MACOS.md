@@ -11,7 +11,7 @@
 3. 双击 `安装插件.command`。若解压工具丢失执行位，可在该目录终端运行 `node scripts/install-macos.mjs`；加 `--check-only` 只预检，加 `--codex-cli <路径>` 指定 CLI。
 4. 安装器把代码复制到 `~/plugins/api-balance-whale`（旧目录整体移入私有备份），写入 `~/.agents/plugins/marketplace.json` 的本插件条目，执行 `codex plugin add api-balance-whale@<市场名>` 并以 `plugin list --json` 确认唯一启用的当前版本。CLI 优先使用桌面应用随附版本（`ChatGPT.app/Contents/Resources/codex-cli`），其次是 `~/.local/bin`、Homebrew 与 PATH。随后编译 Swift 窗口探针，设置独立 Electron bundle ID，注册当前用户 LaunchAgent，以安装标识、插件目录、进程和新鲜心跳验证安装成功。完成后新建 Codex 聊天加载技能与 MCP。
    仅需桌面挂件时运行 `安装 Mac 自动跟随.command`（`--desktop-only`），代码在解压目录原地运行，不注册插件。
-5. 打开 Codex。Cmd+Option+W 切换显示；菜单可切换跟随/独立桌面。`进入独立桌面.command` 可独立启动。
+5. 打开 Codex。Cmd+Option+W 切换显示；菜单可切换跟随/独立桌面。`进入独立桌面.command` 可独立启动。挂件在调度中心和 App Exposé 中隐藏，退出后照常显示；它与 Codex 是不同进程，无法在调度中心合并为同一窗口。
 
 挂件使用 CGWindowList 和 proc_pidpath 定位窗口，本地 Unix socket 通信，无网页端口。默认 bundle ID 为 com.openai.codex，可用 WHALE_CODEX_BUNDLE_ID 指定兼容安装布局。
 
